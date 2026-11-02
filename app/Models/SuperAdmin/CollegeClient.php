@@ -2,24 +2,23 @@
 
 namespace App\Models\SuperAdmin;
 
-use App\Models\SuperAdmin\CollegeAppUser;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class AllCollege extends Model
+class CollegeClient extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'all_colleges';
+    protected $table = 'college_clients';
 
     protected $connection = "default";
 
     protected $fillable = [
         'name',
-        'db_name',
-        'db_user',
-        'db_password',
+        'group',
         'common_branch_id',
         'school_app_code',
         'status',
@@ -58,5 +57,10 @@ class AllCollege extends Model
             'college_id',
             'id'
         );
+    }
+
+    public function franchise(): HasOne
+    {
+        return $this->hasOne(FranchiseMaster::class);
     }
 }

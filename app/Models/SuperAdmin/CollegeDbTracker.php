@@ -5,11 +5,11 @@ namespace App\Models\SuperAdmin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class QuequDbTracker extends Model
+class CollegeDbTracker extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'quequ_db_trackers';
+    protected $table = 'college_db_trackers';
 
     protected $primaryKey = 'id';
 
@@ -18,7 +18,7 @@ class QuequDbTracker extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'db_name',
+        'group',
         'pending_count',
         'processing_count',
         'done_count',

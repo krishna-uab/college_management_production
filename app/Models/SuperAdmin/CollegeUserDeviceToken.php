@@ -5,11 +5,11 @@ namespace App\Models\SuperAdmin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class UserDeviceToken extends Model
+class CollegeUserDeviceToken extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'user_device_tokens';
+    protected $table = 'college_user_device_tokens';
 
     protected $primaryKey = 'id';
 

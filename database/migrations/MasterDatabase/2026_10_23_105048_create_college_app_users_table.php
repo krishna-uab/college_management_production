@@ -41,7 +41,7 @@ return new class extends Migration
 
             $table->foreign('college_id')
                 ->references('id')
-                ->on('all_colleges')
+                ->on('college_clients')
                 ->restrictOnDelete();
         });
     }

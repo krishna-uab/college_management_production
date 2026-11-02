@@ -54,7 +54,7 @@ class CollegeAppUser extends Authenticatable implements JWTSubject
     public function college(): BelongsTo
     {
         return $this->belongsTo(
-            AllCollege::class,
+            CollegeClient::class,
             'college_id',
             'id'
         );

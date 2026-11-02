@@ -9,15 +9,14 @@ return new class extends Migration
 
     public function up(): void
     {
-        Schema::create('quequ_db_trackers', function (Blueprint $table) {
-            
+        Schema::create('college_db_trackers', function (Blueprint $table) {
+
             $table->id('id');
-            $table->string('db_name', 100)->unique();
+            $table->string('group', 100)->unique();
             $table->unsignedInteger('pending_count')->default(0);
             $table->unsignedInteger('processing_count')->default(0);
             $table->unsignedInteger('done_count')->default(0);
             $table->unsignedInteger('failed_count')->default(0);
-
             $table->enum('current_status', [
                 'idle',
                 'running',
@@ -50,8 +49,11 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('quequ_db_trackers');
+        Schema::dropIfExists('college_db_trackers');
     }
 };

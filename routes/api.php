@@ -6,8 +6,15 @@ use App\Http\Controllers\ApiDispatcherController;
 
 Route::post('/v1/login', [AuthController::class, 'login']);
 
+Route::middleware([
+    \App\Http\Middleware\JwtCookieMiddleware::class,
+    'checkFranchiseStatus',
+    'checkCollegePlan',
+])->group(function () {
 
-Route::middleware('auth:api')->group(function () {
+// Route::middleware([
+//     \App\Http\Middleware\JwtCookieMiddleware::class,
+// ])->group(function () {
 
     Route::get('/v1/user', [AuthController::class, 'getUser']);
 
@@ -19,6 +26,3 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{module}/{action}', [ApiDispatcherController::class, 'handle']);
     });
 });
-
-
-

@@ -9,12 +9,10 @@ return new class extends Migration
 
     public function up(): void
     {
-        Schema::create('all_colleges', function (Blueprint $table) {
+        Schema::create('college_clients', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150)->unique();
-            $table->text('db_name')->nullable();
-            $table->text('db_user')->nullable();
-            $table->text('db_password')->nullable();
+            $table->text('group')->nullable();
             $table->unsignedInteger('common_branch_id')->default(0);
             $table->string('school_app_code', 32)
                 ->nullable()
@@ -27,7 +25,7 @@ return new class extends Migration
             $table->unsignedInteger('log_time')->default(360);
             $table->unsignedInteger('active_day')->nullable();
             $table->unsignedInteger('grace_period')->default(0);
-            $table->unsignedBigInteger('franchise_id')->default(1)->index();
+            $table->foreignId('franchise_id')->constrained('franchise_master')->default(1)->index();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->unsignedBigInteger('deleted_by')->nullable();
@@ -41,6 +39,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('all_colleges');
+        Schema::dropIfExists('college_clients');
     }
 };

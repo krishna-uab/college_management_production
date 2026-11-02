@@ -293,7 +293,7 @@ class CrudService
         return $query->get();
     }
 
-    
+
     public function toggleStatus(string $model, int $id, string $column = 'status'): Model
     {
         $this->assertSafeColumn($column);

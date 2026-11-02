@@ -6,16 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+
     public function up(): void
     {
-        Schema::create('database_query_logs', function (Blueprint $table) {
+        Schema::create('college_db_query_logs', function (Blueprint $table) {
             $table->id();
             $table->string('title', 500)->nullable();
-            $table->string('db_name', 255)->nullable();
+            $table->string('group', 255)->nullable();
             $table->longText('query_text')->nullable();
             $table->string('status', 50)->nullable();
             $table->text('error_message')->nullable();
-            $table->index('db_name');
+            $table->index('group');
             $table->index('status');
             $table->index('created_at');
             $table->softDeletes();
@@ -25,6 +26,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('database_query_logs');
+        Schema::dropIfExists('college_db_query_logs');
     }
 };

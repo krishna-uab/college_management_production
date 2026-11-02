@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\SuperAdmin;
 
 use Illuminate\Database\Eloquent\Model;
 
-class DatabaseQueryLog extends Model
+class CollegeDbQueryLog extends Model
 {
-    protected $table = 'school_sql_query_logs';
+    protected $table = 'college_db_query_logs';
 
     protected $primaryKey = 'id';
 
@@ -14,7 +14,7 @@ class DatabaseQueryLog extends Model
 
     protected $fillable = [
         'title',
-        'db_name',
+        'group',
         'query_text',
         'status',
         'error_message',

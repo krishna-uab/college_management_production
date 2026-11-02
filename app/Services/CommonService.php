@@ -3,13 +3,191 @@
 namespace App\Services;
 
 use App\Models\SuperAdmin\CollegeAppUser;
-use App\Models\SuperAdmin\UserDeviceToken;
+use App\Models\SuperAdmin\CollegeClient;
+use App\Models\SuperAdmin\CollegeUserDeviceToken;
+use App\Traits\DatabaseConnectionWriter;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Throwable;
 
 class CommonService
 {
     private const DEFAULT_PASSWORD = '97538642';
+
+    use DatabaseConnectionWriter;
+
+    public function addUpdateCollege(
+        Request $request,
+        $data,
+        bool $isSuperAdmin = false
+    ): JsonResponse {
+        $id = $request->input('id');
+
+        $validator = Validator::make($request->all(), [
+            'id' => 'nullable|integer|exists:college_clients,id',
+
+            'name' => [
+                'required',
+                'string',
+                'max:150',
+                Rule::unique('college_clients', 'name')->ignore($id),
+            ],
+
+            'group' => 'required_without:id|string|max:64|regex:/^[a-zA-Z0-9_-]+$/',
+            'db_name' => 'required_without:id|string|max:64',
+            'db_user' => 'required_without:id|string|max:64',
+            'db_password' => 'nullable|string',
+
+            'common_branch_id' => 'sometimes|integer|min:0',
+
+            'school_app_code' => [
+                'nullable',
+                'string',
+                'max:32',
+                Rule::unique('college_clients', 'school_app_code')->ignore($id),
+            ],
+
+            'status' => 'nullable|boolean',
+            'reg_date' => 'required|date',
+            'renewal_date' => 'nullable|date|after_or_equal:reg_date',
+            'user_type' => 'required|integer|between:0,255',
+            'plan_type' => 'required|integer|between:0,65535',
+            'log_time' => 'sometimes|integer|min:0',
+            'active_day' => 'nullable|integer|min:0',
+            'grace_period' => 'sometimes|integer|min:0',
+
+            'app_user' => 'nullable|array',
+            'app_user.registration_id' => 'nullable|integer',
+            'app_user.mobile_no' => 'nullable|string|max:10',
+            'app_user.email' => 'nullable|email|max:255',
+            'app_user.password' => 'nullable|string|min:1',
+        ]);
+
+        //  'db_password' => 'required_without:id|string',
+
+        $validated = $validator->validate();
+
+
+        $id = $validated['id'] ?? null;
+
+        $franchiseId = (int) ($data->get('franchise_id') ?? 1);
+
+        if ($franchiseId < 1) {
+            $franchiseId = 1;
+        }
+
+        $userId =Auth::id();
+        $ipAddress = $request->ip();
+
+        try {
+            $college = DB::transaction(function () use (
+                $validated,
+                $id,
+                $franchiseId,
+                $userId,
+                $ipAddress,
+                $isSuperAdmin
+            ) {
+                $collegeData = collect($validated)
+                    ->except(['id', 'app_user', 'db_name', 'db_user', 'db_password'])
+                    ->all();
+
+
+                unset(
+                    $collegeData['created_by'],
+                    $collegeData['updated_by'],
+                    $collegeData['deleted_by'],
+                    $collegeData['ip_address'],
+                    $collegeData['created_at'],
+                    $collegeData['updated_at'],
+                    $collegeData['deleted_at']
+                );
+
+                if ($id) {
+                    $collegeQuery = CollegeClient::query();
+
+                    // Franchise users can update only their own colleges.
+                    if (!$isSuperAdmin) {
+                        $collegeQuery->where(
+                            'franchise_id',
+                            $franchiseId
+                        );
+                    }
+
+                    $college = $collegeQuery->lockForUpdate()->findOrFail($id);
+
+                    // Do not change ownership using request data.
+                    unset($collegeData['franchise_id']);
+
+                    $college->fill($collegeData);
+                    $college->updated_by = $userId;
+                    $college->ip_address = $ipAddress;
+                    $college->save();
+                } else {
+                    $collegeData['franchise_id'] = $franchiseId;
+                    $collegeData['created_by'] = $userId;
+                    $collegeData['updated_by'] = $userId;
+                    $collegeData['ip_address'] = $ipAddress;
+
+                    $college = CollegeClient::create($collegeData);
+
+
+                    $connectionResult = $this->addConnection(
+                        $validated['group'],
+                        $validated['db_name'],
+                        $validated['db_user'],
+                        $validated['db_password'] ?? '',
+                        $validated['name']
+                    );
+                    if (!$connectionResult->getData(true)) {
+                        throw new RuntimeException("Unable to create database connection");
+                    }
+                }
+
+                $existingAppUser = CollegeAppUser::where(
+                    'college_id',
+                    $college->id
+                )
+                    ->where('user_privilege_id', 2)
+                    ->first();
+
+                $userData = $validated['app_user'];
+                $userData['college_id'] = $college->id;
+                $userData['user_privilege_id'] = 2;
+
+                $this->createAppUser(
+                    $userData,
+                    $existingAppUser?->id
+                );
+
+                return $college->fresh();
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => $id
+                    ? 'College and app user updated successfully.'
+                    : 'College and app user created successfully.',
+                'data' => $college,
+            ], $id ? 200 : 201);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to save college details.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function createAppUser(array $data, ?int $id = null): CollegeAppUser
     {
@@ -24,7 +202,7 @@ class CommonService
             'switch_branch_permission' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
             'login_status' => 'sometimes|boolean',
-            'college_id' => 'nullable|integer|exists:all_colleges,id',
+            'college_id' => 'nullable|integer|exists:college_clients,id',
         ]);
 
         $validated = $validator->validate();
@@ -77,25 +255,12 @@ class CommonService
         return CollegeAppUser::findOrFail($id);
     }
 
+
     // add update user device token
 
     // # how to use addUpdateUserDeviceTokens
     public function addUpdateUserDeviceTokens(array $data): array
     {
-
-        // data need
-
-        // [
-        //     'college_id'   => $collegeId,
-        //     'user_id'      => $userId,
-        //     'device_id'    => $request->device_id,
-        //     'device_token' => $request->device_token,
-        //     'device_name'  => $request->device_name,
-        //     'platform'     => $request->platform ?? 'android',
-        //     'is_active'    => 1,
-        //     'ip_address'   => $request->ip(),
-        // ]
-
         return DB::transaction(function () use ($data) {
 
             $collegeId = $data['college_id'];
@@ -114,7 +279,7 @@ class CommonService
             ];
 
             // Same user + same device: update existing record.
-            $query = UserDeviceToken::where('college_id', $collegeId)
+            $query = CollegeUserDeviceToken::where('college_id', $collegeId)
                 ->where('user_id', $userId);
 
             if ($deviceId !== null && $deviceId !== '') {
@@ -136,7 +301,7 @@ class CommonService
             }
 
             // Lock existing records for this user.
-            $devices = UserDeviceToken::where('college_id', $collegeId)
+            $devices = CollegeUserDeviceToken::where('college_id', $collegeId)
                 ->where('user_id', $userId)
                 ->orderByRaw('last_login_at IS NULL DESC')
                 ->orderBy('last_login_at', 'asc')
@@ -146,7 +311,7 @@ class CommonService
 
             // Less than 3 devices: create a new record.
             if ($devices->count() < 3) {
-                $token = UserDeviceToken::create([
+                $token = CollegeUserDeviceToken::create([
                     'college_id' => $collegeId,
                     'user_id'    => $userId,
                     ...$details,
@@ -171,7 +336,5 @@ class CommonService
             ];
         });
     }
-
-    // queue tracker management
 
 }
