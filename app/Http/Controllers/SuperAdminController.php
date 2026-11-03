@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SuperAdmin\CollegeAppUser;
 use App\Models\SuperAdmin\CollegeClient;
 use App\Models\SuperAdmin\FranchiseAgreement;
 use App\Models\SuperAdmin\FranchiseBankDetail;
@@ -46,6 +47,9 @@ class SuperadminController extends Controller
         $data = JWTAuth::getPayload();
 
         switch ($action) {
+
+
+
             case 'get-franchise':
                 return $this->getFrachise($request, $data);
 
@@ -57,14 +61,27 @@ class SuperadminController extends Controller
 
             case 'get-franchise-documents':
                 return $this->getFranchiseDocuments($request, $data);
+
             case 'add-update-franchise-bank-details':
                 return $this->addUpdateFranchiseBankDetails($request, $data);
+
             case 'get-franchise-bank-details':
                 return $this->getFranchiseBankDetails($request, $data);
+
+            case 'make-franchise-bank-primary':
+                return $this->makeFranchiseBankPrimary($request, $data);
+
+            case 'remove-franchise-bank':
+                return $this->removeFranchiseBank($request, $data);
 
             case 'add-update-franchise-agreement':
                 return $this->addUpdateFranchiseAgreement($request, $data);
 
+            case 'create-franchise-login':
+                return $this->createFranchiseLogin($request, $data);
+
+            case 'get-franchise-login-info':
+                return $this->getFranchiseLoginInfo($request, $data);
 
             case 'trash-franchise':
                 return $this->trashFrachise($request, $data);
@@ -78,15 +95,16 @@ class SuperadminController extends Controller
             case 'delete-franchise':
                 return $this->deleteFranchise($request, $data);
 
+                /* ==================== COLLEGE ==================== */
+
             case 'get-colleges':
                 return $this->getCollege($request, $data);
-
-            case 'create-college-db-connection':
-                return $this->createCollegeDbConnection($request, $data);
 
             case 'add-update-client':
                 return $this->addUpdateCollege($request, $data);
 
+            case 'create-college-db-connection':
+                return $this->createCollegeDbConnection($request, $data);
 
             default:
                 return response()->json([
@@ -96,89 +114,11 @@ class SuperadminController extends Controller
         }
     }
 
-    public function getCollege(Request $request, $data)
-    {
-        try {
+    /* =====================================================================
+     |  FRANCHISE
+     | ===================================================================== */
 
-            $columns =  [
-                'id',
-                'name',
-                'common_branch_id',
-                'school_app_code',
-                'status',
-                'reg_date',
-                'renewal_date',
-                'user_type',
-                'plan_type',
-                'log_time',
-                'active_day',
-                'grace_period',
-                'franchise_id',
-            ];
-
-
-
-            $colleges = $this->crudService->getRecordsWithCustomColumns(CollegeClient::class, $columns, [], [], 'id', 'desc');
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'College list fetched successfully.',
-                'data'    => $colleges,
-            ], 200);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to fetch colleges.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function addUpdateCollege(Request $request, $data)
-    {
-
-        return $this->commonService->addUpdateCollege(
-            $request,
-            $data,
-            true
-        );
-    }
-    public function getCollegeById(Request $request, $data)
-    {
-        try {
-
-            $columns =  [
-                'id',
-                'name',
-                'common_branch_id',
-                'school_app_code',
-                'status',
-                'reg_date',
-                'renewal_date',
-                'user_type',
-                'plan_type',
-                'log_time',
-                'active_day',
-                'grace_period',
-                'franchise_id',
-            ];
-
-            $colleges = $this->crudService->getRecordWithCustomColumns(CollegeClient::class, $columns, [], ["id" => $request->id], 'id', 'desc');
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'College list fetched successfully.',
-                'data'    => $colleges,
-            ], 200);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to fetch colleges.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
+    // 1. Get franchise (all or by id)
     public function getFrachise(Request $request, $data)
     {
         try {
@@ -204,8 +144,11 @@ class SuperadminController extends Controller
         }
     }
 
+    // 2. Add or update franchise
+
     public function addUpdateFranchise(Request $request, $data = null)
     {
+
         $id = $request->input('id');
 
         $validator = Validator::make($request->all(), [
@@ -327,131 +270,7 @@ class SuperadminController extends Controller
         }
     }
 
-    public function addUpdateFranchiseBankDetails(Request $request, $data = null)
-    {
-        $id = $request->input('id');
-
-        $validator = Validator::make($request->all(), [
-            'id'                     => 'nullable|integer|exists:franchise_bank_details,id',
-
-            'franchise_id'            => 'required|integer|exists:franchise_master,id',
-
-            'account_holder_name'     => 'required|string|max:150',
-            'bank_name'               => 'required|string|max:100',
-            'branch_name'             => 'nullable|string|max:100',
-            'branch_address'          => 'nullable|string|max:255',
-
-            'account_number_encrypted' => 'required|string',
-            'account_last4'            => 'required|digits:4',
-            'ifsc_code'                => 'required|string|size:11|regex:/^[A-Z]{4}0[A-Z0-9]{6}$/i',
-            'micr_code'                => 'nullable|string|size:9',
-            'account_type'             => 'required|in:savings,current,overdraft',
-            'upi_id'                   => 'nullable|string|max:100',
-
-            'is_primary'               => 'nullable|boolean',
-            'is_active'                => 'nullable|boolean',
-
-            'cancelled_cheque_doc_id'  => 'nullable|integer|exists:franchise_documents,id',
-
-            'verification_status'      => 'nullable|in:pending,verified,rejected',
-            'verified_by'               => 'nullable|integer',
-            'verified_at'               => 'nullable|date',
-            'remarks'                  => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Validation failed.',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $validated = $validator->validated();
-            $id = $validated['id'] ?? null;
-
-            $bankDetails = DB::transaction(function () use ($validated, $id) {
-
-                $bankData = collect($validated)
-                    ->except(['id'])
-                    ->all();
-
-                if (!$id) {
-                    $bankData['is_primary'] = $bankData['is_primary'] ?? false;
-                    $bankData['is_active'] = $bankData['is_active'] ?? true;
-                    $bankData['verification_status'] =
-                        $bankData['verification_status'] ?? 'pending';
-
-                    // New bank details are pending verification by default.
-                    $bankData['verified_by'] = null;
-                    $bankData['verified_at'] = null;
-                }
-
-                if ($id) {
-                    $bankDetails = FranchiseBankDetail::findOrFail($id);
-
-                    $bankDetails->fill($bankData);
-                    $bankDetails->save();
-                } else {
-                    $bankDetails = FranchiseBankDetail::create($bankData);
-                }
-
-                return $bankDetails->fresh();
-            });
-
-            return response()->json([
-                'status'  => true,
-                'message' => $id
-                    ? 'Franchise bank details updated successfully.'
-                    : 'Franchise bank details created successfully.',
-                'data'    => $bankDetails,
-            ], $id ? 200 : 201);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to save franchise bank details.',
-            ], 500);
-        }
-    }
-
-    public function getFranchiseBankDetails(Request $request, $data)
-    {
-        try {
-            $validated = $request->validate([
-                "franchise_id" => ['required', 'exists:franchise_master,id']
-            ]);
-
-            $franchise = FranchiseMaster::find($request->franchise_id);
-
-            if (!$franchise) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Franchise not found.',
-                ], 404);
-            }
-
-            // get bank details
-
-            $bank_details = $franchise->bankDetails();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Documents fetched successfully.',
-                'data' => $bank_details,
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'status' => false,
-                'message' => 'Unable to fetch documents.',
-            ], 500);
-        }
-    }
-
+    // 3. Add or update franchise documents
     public function addUpdateFranchiseDocuments(Request $request, $data = null)
     {
         $documentFields = [
@@ -607,6 +426,7 @@ class SuperadminController extends Controller
         }
     }
 
+    // 4. Get franchise documents
     public function getFranchiseDocuments(Request $request, $data)
     {
         try {
@@ -681,7 +501,256 @@ class SuperadminController extends Controller
         }
     }
 
+    // 5. Add or update franchise bank details
+    public function addUpdateFranchiseBankDetails(Request $request, $data = null)
+    {
+        $id = $request->input('id');
 
+        $validator = Validator::make($request->all(), [
+            'id'                     => 'nullable|integer|exists:franchise_bank_details,id',
+
+            'franchise_id'            => 'required|integer|exists:franchise_master,id',
+
+            'account_holder_name'     => 'required|string|max:150',
+            'bank_name'               => 'required|string|max:100',
+            'branch_name'             => 'nullable|string|max:100',
+            'branch_address'          => 'nullable|string|max:255',
+            // Naya record: required. Edit: blank chhodo to purana account number rahega.
+            'account_number'          => $id ? 'nullable|string' : 'required|string',
+            'ifsc_code'                => 'required|string|size:11|regex:/^[A-Z]{4}0[A-Z0-9]{6}$/i',
+            'micr_code'                => 'nullable|string|size:9',
+            'account_type'             => 'required|in:savings,current,overdraft',
+            'upi_id'                   => 'nullable|string|max:100',
+
+            'is_primary'               => 'nullable|boolean',
+            'is_active'                => 'nullable|boolean',
+
+            'cancelled_cheque_doc_id'  => 'nullable|integer|exists:franchise_documents,id',
+
+            'verification_status'      => 'nullable|in:pending,verified,rejected',
+            'verified_by'               => 'nullable|integer',
+            'verified_at'               => 'nullable|date',
+            'remarks'                  => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation failed.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+
+            $validated = $validator->validated();
+
+            // Account number diya hai tabhi last4 banao, warna purana rehne do
+            if (!empty($validated['account_number'])) {
+                $validated['account_last4'] = substr(
+                    preg_replace('/\s+/', '', $validated['account_number']),
+                    -4
+                );
+            } else {
+                unset($validated['account_number']);
+            }
+
+            $id = $validated['id'] ?? null;
+
+
+            $bankDetails = DB::transaction(function () use ($validated, $id) {
+
+                $bankData = collect($validated)
+                    ->except(['id'])
+                    ->all();
+
+                if (!$id) {
+                    $bankData['is_primary'] = $bankData['is_primary'] ?? false;
+                    $bankData['is_active'] = $bankData['is_active'] ?? true;
+                    $bankData['verification_status'] =
+                        $bankData['verification_status'] ?? 'pending';
+                    $bankData['verified_by'] = null;
+                    $bankData['verified_at'] = null;
+                }
+
+                if ($id) {
+                    $bankDetails = FranchiseBankDetail::findOrFail($id);
+                    $bankDetails->fill($bankData);
+                    $bankDetails->save();
+                } else {
+                    $bankDetails = FranchiseBankDetail::create($bankData);
+                }
+
+                // Ye primary hai to baaki accounts non-primary
+                if (!empty($bankData['is_primary'])) {
+                    FranchiseBankDetail::where('franchise_id', $bankDetails->franchise_id)
+                        ->where('id', '!=', $bankDetails->id)
+                        ->update(['is_primary' => false]);
+                }
+
+                return $bankDetails->fresh();
+            });
+
+            return response()->json([
+                'status'  => true,
+                'message' => $id
+                    ? 'Franchise bank details updated successfully.'
+                    : 'Franchise bank details created successfully.',
+                'data'    => $bankDetails,
+            ], $id ? 200 : 201);
+        } catch (\Throwable $e) {
+            // report($e);
+            return response()->json([
+                'status'  => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 6. Get franchise bank details (saare accounts ki list)
+    public function getFranchiseBankDetails(Request $request, $data)
+    {
+        try {
+            $validated = $request->validate([
+                "franchise_id" => ['required', 'exists:franchise_master,id']
+            ]);
+
+            $franchise = FranchiseMaster::find($request->franchise_id);
+
+            if (!$franchise) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Franchise not found.',
+                ], 404);
+            }
+
+            // primary pehle, phir latest
+            $bank_details = $franchise->bankDetails()
+                ->orderByDesc('is_primary')
+                ->orderByDesc('id')
+                ->get();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Bank details fetched successfully.',
+                'data' => $bank_details,
+            ]);
+        } catch (\Throwable $e) {
+            // report($e);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to fetch bank details.',
+            ], 500);
+        }
+    }
+
+    // 7. Make franchise bank account primary
+    public function makeFranchiseBankPrimary(Request $request, $data)
+    {
+        $validator = Validator::make($request->all(), [
+            'bank_account_id' => 'required|integer|exists:franchise_bank_details,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation failed.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $bank = DB::transaction(function () use ($request) {
+                $bank = FranchiseBankDetail::findOrFail($request->bank_account_id);
+
+                // Pehle us franchise ke sab accounts non-primary
+                FranchiseBankDetail::where('franchise_id', $bank->franchise_id)
+                    ->update(['is_primary' => false]);
+
+                $bank->is_primary = true;
+                $bank->save();
+
+                return $bank->fresh();
+            });
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Primary bank account updated successfully.',
+                'data'    => $bank,
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Bank account not found.',
+            ], 404);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to update primary bank account.',
+            ], 500);
+        }
+    }
+
+    // 8. Remove franchise bank account
+    public function removeFranchiseBank(Request $request, $data)
+    {
+        $validator = Validator::make($request->all(), [
+            'bank_account_id' => 'required|integer|exists:franchise_bank_details,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation failed.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            DB::transaction(function () use ($request) {
+                $bank = FranchiseBankDetail::findOrFail($request->bank_account_id);
+
+                $franchiseId = $bank->franchise_id;
+                $wasPrimary  = (bool) $bank->is_primary;
+
+                $bank->delete();
+
+                // Primary hata to sabse purana bacha hua account primary
+                if ($wasPrimary) {
+                    $next = FranchiseBankDetail::where('franchise_id', $franchiseId)
+                        ->orderBy('id')
+                        ->first();
+
+                    if ($next) {
+                        $next->is_primary = true;
+                        $next->save();
+                    }
+                }
+            });
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Bank account removed successfully.',
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Bank account not found.',
+            ], 404);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to remove bank account.',
+            ], 500);
+        }
+    }
+
+    // 9. Add or update franchise agreement
     public function addUpdateFranchiseAgreement(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -865,6 +934,116 @@ class SuperadminController extends Controller
         }
     }
 
+    // 10. Create franchise login
+    public function createFranchiseLogin(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'franchise_id' => 'required|integer|exists:franchise_master,id',
+                'email'        => ['required', 'email', 'max:150'],
+                'mobile_no'    => ['required', 'string', 'max:10'],
+            ]);
+
+            // Pehle se login bana hai ya nahi
+            $exists = CollegeAppUser::where('registration_id', $validated['franchise_id'])
+                ->where('user_privilege_id', 1)
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Login already created for this franchise.',
+                ], 422);
+            }
+
+            // 12 char random password (letters + numbers)
+            $password = $this->commonService->generateRandomPassword(12);
+
+            $user = DB::transaction(function () use ($validated, $password) {
+                return $this->commonService->createAppUser([
+                    'registration_id'   => $validated['franchise_id'],
+                    'mobile_no'         => $validated['mobile_no'],
+                    'email'             => $validated['email'],
+                    'password'          => $password,
+                    'user_privilege_id' => 1,
+                    'is_active'         => true,
+                    'login_status'      => false,
+                ]);
+            });
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Franchise login created successfully.',
+                'data'    => [
+                    "franchise_id" => $validated['franchise_id'],
+                    'login_user_id'       => $user->id,
+                    'email'    => $user->email,
+                    'mobile'   => $user->mobile_no,
+                ],
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation failed.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to create franchise login.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 11. Get franchise login info
+    public function getFranchiseLoginInfo(Request $request, $data)
+    {
+        try {
+
+            $validated = $request->validate([
+                "franchise_id" => ['required', 'exists:franchise_master,id']
+            ]);
+
+            // get Login User here
+
+            $franchise = FranchiseMaster::select('id', 'owner_email', 'owner_phone')->find($request->franchise_id);
+
+            $loginUser = CollegeAppUser::where('registration_id', $franchise->id)->first();
+
+            $responseData = [];
+
+            if ($loginUser) {
+                $responseData = [
+                    'franchise_id' => $franchise->id,
+                    'email' => $franchise->owner_email,
+                    'mobile_no' => $franchise->owner_phone,
+                    'login_user_id' => $loginUser->id,
+                ];
+            } else {
+                $responseData = [
+                    'franchise_id' => $franchise->id,
+                    'email' => $franchise->owner_email,
+                    'mobile_no' => $franchise->owner_phone,
+                    'login_user_id' => null,
+                ];
+            }
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Franchise login info fetched successfully.',
+                'data'    => $responseData,
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to fetch franchise login info.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 12. Move franchise to trash (soft delete)
     public function trashFrachise(Request $request, $data)
     {
         $validator = Validator::make($request->all(), [
@@ -908,6 +1087,7 @@ class SuperadminController extends Controller
         }
     }
 
+    // 13. Restore franchise from trash
     public function restoreFranchise(Request $request, $data)
     {
         try {
@@ -935,6 +1115,7 @@ class SuperadminController extends Controller
         }
     }
 
+    // 14. Get trashed franchises
     public function deletedFranchise($data)
     {
         try {
@@ -961,6 +1142,7 @@ class SuperadminController extends Controller
         }
     }
 
+    // 15. Permanently delete franchise
     public function deleteFranchise(Request $request, $data)
     {
         $validator = Validator::make($request->all(), [
@@ -1004,7 +1186,78 @@ class SuperadminController extends Controller
         }
     }
 
-    // create a new database connection
+    /* =====================================================================
+     |  COLLEGE
+     | ===================================================================== */
+
+    // 16. Get all colleges
+    public function getCollege(Request $request, $data)
+    {
+        try {
+
+            return response()->json([
+                'status'  => true,
+                'data'    => $data,
+            ], 200);
+
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to fetch colleges.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 17. Add or update college
+    public function addUpdateCollege(Request $request, $data)
+    {
+        return $this->commonService->addUpdateCollege(
+            $request,
+            $data,
+            true
+        );
+    }
+
+    // 18. Get college by ID
+    public function getCollegeById(Request $request, $data)
+    {
+        try {
+
+            $columns =  [
+                'id',
+                'name',
+                'common_branch_id',
+                'school_app_code',
+                'status',
+                'reg_date',
+                'renewal_date',
+                'user_type',
+                'plan_type',
+                'log_time',
+                'active_day',
+                'grace_period',
+                'franchise_id',
+            ];
+
+            $colleges = $this->crudService->getRecordWithCustomColumns(CollegeClient::class, $columns, [], ["id" => $request->id], 'id', 'desc');
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'College list fetched successfully.',
+                'data'    => $colleges,
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to fetch colleges.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 19. Create college DB connection
     public function createCollegeDbConnection(Request $request, $data): JsonResponse
     {
         $validatedData = $request->validate([

@@ -4,8 +4,8 @@ namespace App\Models\SuperAdmin;
 
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CollegeClient extends Model
@@ -19,6 +19,11 @@ class CollegeClient extends Model
     protected $fillable = [
         'name',
         'group',
+        'owner_name',
+        'address',
+        'city',
+        'state',
+        'country',
         'common_branch_id',
         'school_app_code',
         'status',
@@ -36,7 +41,6 @@ class CollegeClient extends Model
         'ip_address',
     ];
 
-
     protected function casts(): array
     {
         return [
@@ -49,7 +53,6 @@ class CollegeClient extends Model
         ];
     }
 
-
     public function users(): HasMany
     {
         return $this->hasMany(
@@ -59,8 +62,8 @@ class CollegeClient extends Model
         );
     }
 
-    public function franchise(): HasOne
+    public function franchise(): BelongsTo
     {
-        return $this->hasOne(FranchiseMaster::class);
+        return $this->belongsTo(FranchiseMaster::class, 'franchise_id');
     }
 }

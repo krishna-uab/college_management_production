@@ -44,6 +44,12 @@ class CommonService
             'db_user' => 'required_without:id|string|max:64',
             'db_password' => 'nullable|string',
 
+            'owner_name' => 'nullable|string|max:150',
+            'address'    => 'nullable|string',
+            'city'       => 'nullable|string|max:100',
+            'state'      => 'nullable|string|max:100',
+            'country'    => 'nullable|string|max:50',
+
             'common_branch_id' => 'sometimes|integer|min:0',
 
             'school_app_code' => [
@@ -66,13 +72,10 @@ class CommonService
             'app_user.registration_id' => 'nullable|integer',
             'app_user.mobile_no' => 'nullable|string|max:10',
             'app_user.email' => 'nullable|email|max:255',
-            'app_user.password' => 'nullable|string|min:1',
+            // app_user.password nahi lete, ye generate hota hai
         ]);
 
-        //  'db_password' => 'required_without:id|string',
-
         $validated = $validator->validate();
-
 
         $id = $validated['id'] ?? null;
 
@@ -82,8 +85,9 @@ class CommonService
             $franchiseId = 1;
         }
 
-        $userId =Auth::id();
+        $userId = Auth::id();
         $ipAddress = $request->ip();
+        $generatedPassword = null;
 
         try {
             $college = DB::transaction(function () use (
@@ -92,7 +96,8 @@ class CommonService
                 $franchiseId,
                 $userId,
                 $ipAddress,
-                $isSuperAdmin
+                $isSuperAdmin,
+                &$generatedPassword
             ) {
                 $collegeData = collect($validated)
                     ->except(['id', 'app_user', 'db_name', 'db_user', 'db_password'])
@@ -137,7 +142,6 @@ class CommonService
 
                     $college = CollegeClient::create($collegeData);
 
-
                     $connectionResult = $this->addConnection(
                         $validated['group'],
                         $validated['db_name'],
@@ -145,8 +149,14 @@ class CommonService
                         $validated['db_password'] ?? '',
                         $validated['name']
                     );
-                    if (!$connectionResult->getData(true)) {
-                        throw new RuntimeException("Unable to create database connection");
+
+                    // getData(true) hamesha array deta hai, isliye 'success' key check karo
+                    $connResult = $connectionResult->getData(true);
+
+                    if (($connResult['success'] ?? false) !== true) {
+                        throw new RuntimeException(
+                            $connResult['message'] ?? 'Unable to create database connection'
+                        );
                     }
                 }
 
@@ -157,9 +167,17 @@ class CommonService
                     ->where('user_privilege_id', 2)
                     ->first();
 
-                $userData = $validated['app_user'];
+                // app_user na aaye to bhi error nahi aayega
+                $userData = $validated['app_user'] ?? [];
                 $userData['college_id'] = $college->id;
                 $userData['user_privilege_id'] = 2;
+                unset($userData['password']);
+
+                // Password sirf naye app user ke liye generate hoga
+                if (!$existingAppUser) {
+                    $generatedPassword = $this->generateRandomPassword(12);
+                    $userData['password'] = $generatedPassword;
+                }
 
                 $this->createAppUser(
                     $userData,
@@ -175,6 +193,8 @@ class CommonService
                     ? 'College and app user updated successfully.'
                     : 'College and app user created successfully.',
                 'data' => $college,
+                // Naya app user bana ho tabhi value aayegi, warna null
+                'created_app_user_password' => $generatedPassword,
             ], $id ? 200 : 201);
         } catch (ValidationException $e) {
             throw $e;
@@ -210,41 +230,38 @@ class CommonService
         $registrationId = $validated['registration_id'] ?? null;
         $mobileNo = $validated['mobile_no'] ?? null;
 
-        // Password priority:
-        // 1. Request password
-        // 2. Mobile number
-        // 3. Default password
-
-        $password = $validated['password']
-            ?? $mobileNo
-            ?? self::DEFAULT_PASSWORD;
-
-        $validated['user_key'] = base64_encode($password);
-        $validated['password'] = $password;
-
+        // Pehle user dhundo, kyunki password ka faisla isi par depend karta hai
         if ($id !== null) {
             $user = CollegeAppUser::findOrFail($id);
-            $user->fill($validated);
         } elseif ($registrationId !== null && $mobileNo !== null) {
-
-            $user = CollegeAppUser::where(
-                'registration_id',
-                $registrationId
-            )
+            $user = CollegeAppUser::where('registration_id', $registrationId)
                 ->where('mobile_no', $mobileNo)
-                ->first();
-
-            if ($user) {
-                $user->fill($validated);
-            } else {
-                $user = new CollegeAppUser();
-                $user->fill($validated);
-            }
+                ->first() ?? new CollegeAppUser();
         } else {
             $user = new CollegeAppUser();
-            $user->fill($validated);
         }
 
+        // Password priority:
+        // 1. Request / generated password
+        // 2. Naya user ho to mobile number
+        // 3. Naya user ho to default password
+        // Existing user ka password tab tak nahi badalta jab tak naya na diya jaye.
+        if (!empty($validated['password'])) {
+            $password = $validated['password'];
+        } elseif (!$user->exists) {
+            $password = $mobileNo ?? self::DEFAULT_PASSWORD;
+        } else {
+            $password = null;
+        }
+
+        if ($password !== null) {
+            $validated['password'] = $password;
+            $validated['user_key'] = base64_encode($password);
+        } else {
+            unset($validated['password'], $validated['user_key']);
+        }
+
+        $user->fill($validated);
         $user->save();
 
         return $user->fresh();
@@ -255,8 +272,32 @@ class CommonService
         return CollegeAppUser::findOrFail($id);
     }
 
+    // for generate random password
+    public function generateRandomPassword(int $length = 12): string
+    {
+        $upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $lower   = 'abcdefghijkmnpqrstuvwxyz';
+        $numbers = '23456789';
+        $all     = $upper . $lower . $numbers;
 
-    // add update user device token
+        $password = [
+            $upper[random_int(0, strlen($upper) - 1)],
+            $lower[random_int(0, strlen($lower) - 1)],
+            $numbers[random_int(0, strlen($numbers) - 1)],
+        ];
+
+        for ($i = count($password); $i < $length; $i++) {
+            $password[] = $all[random_int(0, strlen($all) - 1)];
+        }
+
+        for ($i = count($password) - 1; $i > 0; $i--) {
+            $j = random_int(0, $i);
+            [$password[$i], $password[$j]] = [$password[$j], $password[$i]];
+        }
+
+        return implode('', $password);
+    }
+
 
     // # how to use addUpdateUserDeviceTokens
     public function addUpdateUserDeviceTokens(array $data): array
@@ -336,5 +377,4 @@ class CommonService
             ];
         });
     }
-
 }

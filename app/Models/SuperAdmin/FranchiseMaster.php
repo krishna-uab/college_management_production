@@ -147,4 +147,7 @@ class FranchiseMaster extends Model
         $next = (static::withTrashed()->max('id') ?? 0) + 1;
         return sprintf('FR-%s-%04d', strtoupper($stateCode), $next);
     }
+
+
+    
 }

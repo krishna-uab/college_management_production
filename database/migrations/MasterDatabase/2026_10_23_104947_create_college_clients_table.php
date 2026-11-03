@@ -13,6 +13,11 @@ return new class extends Migration
             $table->id();
             $table->string('name', 150)->unique();
             $table->text('group')->nullable();
+            $table->string('owner_name', 150)->nullable();
+            $table->text('address')->nullable();
+            $table->string('city', 100)->nullable();
+            $table->string('state', 100)->nullable();
+            $table->string('country', 50)->default('India');
             $table->unsignedInteger('common_branch_id')->default(0);
             $table->string('school_app_code', 32)
                 ->nullable()

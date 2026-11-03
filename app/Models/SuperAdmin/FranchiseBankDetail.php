@@ -19,7 +19,7 @@ class FranchiseBankDetail extends Model
         'bank_name',
         'branch_name',
         'branch_address',
-        'account_number_encrypted',
+        'account_number',
         'account_last4',
         'ifsc_code',
         'micr_code',
@@ -34,11 +34,9 @@ class FranchiseBankDetail extends Model
         'remarks',
     ];
 
-    // API response me encrypted account number kabhi na jaye
-    protected $hidden = ['account_number_encrypted'];
+    protected $hidden = ['account_number'];
 
     protected $casts = [
-        'account_number_encrypted' => 'encrypted',   // APP_KEY se auto encrypt/decrypt
         'is_primary'               => 'boolean',
         'is_active'                => 'boolean',
         'verified_at'              => 'datetime',
@@ -48,18 +46,11 @@ class FranchiseBankDetail extends Model
     protected static function booted(): void
     {
         static::saving(function (self $model) {
-            // Account number se last 4 digit auto set
-            if ($model->isDirty('account_number_encrypted') && $model->account_number_encrypted) {
-                $model->account_last4 = substr($model->account_number_encrypted, -4);
-            }
-
-            // IFSC hamesha uppercase
             if ($model->ifsc_code) {
                 $model->ifsc_code = strtoupper($model->ifsc_code);
             }
         });
 
-        // Ek franchise ka sirf ek primary account
         static::saved(function (self $model) {
             if ($model->is_primary) {
                 static::where('franchise_id', $model->franchise_id)
@@ -70,7 +61,6 @@ class FranchiseBankDetail extends Model
         });
     }
 
-    // ---------- Relations ----------
     public function franchise(): BelongsTo
     {
         return $this->belongsTo(FranchiseMaster::class, 'franchise_id');
@@ -81,8 +71,6 @@ class FranchiseBankDetail extends Model
         return $this->belongsTo(FranchiseDocument::class, 'cancelled_cheque_doc_id');
     }
 
-
-    // ---------- Scopes ----------
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -98,14 +86,11 @@ class FranchiseBankDetail extends Model
         return $query->where('verification_status', 'verified');
     }
 
-    // ---------- Accessors ----------
-    // Display ke liye: XXXXXXXX1234
     public function getMaskedAccountNumberAttribute(): string
     {
         return 'XXXXXXXX' . $this->account_last4;
     }
 
-    // ---------- Helpers ----------
     public function isVerified(): bool
     {
         return $this->verification_status === 'verified';
@@ -138,7 +123,6 @@ class FranchiseBankDetail extends Model
         });
     }
 
-    // IFSC format check: 4 letters + 0 + 6 alphanumeric (e.g. SBIN0001234)
     public static function isValidIfsc(string $ifsc): bool
     {
         return (bool) preg_match('/^[A-Z]{4}0[A-Z0-9]{6}$/', strtoupper($ifsc));
