@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
@@ -40,8 +41,8 @@ class CommonService
             ],
 
             'group' => 'required_without:id|string|max:64|regex:/^[a-zA-Z0-9_-]+$/',
-            'db_name' => 'required_without:id|string|max:64',
-            'db_user' => 'required_without:id|string|max:64',
+            'db_name' => 'nullable|string|max:64',
+            'db_user' => 'nullable|string|max:64',
             'db_password' => 'nullable|string',
 
             'owner_name' => 'nullable|string|max:150',
@@ -58,21 +59,16 @@ class CommonService
                 'max:32',
                 Rule::unique('college_clients', 'school_app_code')->ignore($id),
             ],
-
+            'email' => 'nullable|email',
+            'mobile_no' => 'nullable|string|max:15',
             'status' => 'nullable|boolean',
             'reg_date' => 'required|date',
             'renewal_date' => 'nullable|date|after_or_equal:reg_date',
-            'user_type' => 'required|integer|between:0,255',
-            'plan_type' => 'required|integer|between:0,65535',
+            'plan_id' => 'required|integer|between:0,255',
+            'plan_type_id' => 'required|integer|between:0,65535',
             'log_time' => 'sometimes|integer|min:0',
             'active_day' => 'nullable|integer|min:0',
             'grace_period' => 'sometimes|integer|min:0',
-
-            'app_user' => 'nullable|array',
-            'app_user.registration_id' => 'nullable|integer',
-            'app_user.mobile_no' => 'nullable|string|max:10',
-            'app_user.email' => 'nullable|email|max:255',
-            // app_user.password nahi lete, ye generate hota hai
         ]);
 
         $validated = $validator->validate();
@@ -167,13 +163,15 @@ class CommonService
                     ->where('user_privilege_id', 2)
                     ->first();
 
-                // app_user na aaye to bhi error nahi aayega
-                $userData = $validated['app_user'] ?? [];
-                $userData['college_id'] = $college->id;
-                $userData['user_privilege_id'] = 2;
-                unset($userData['password']);
+                $userData = [
+                    'registration_id'  => $college->id,
+                    'college_id'       => $college->id,
+                    'user_privilege_id' => 2,
+                    'email'            => $college->email,
+                    'mobile_no'        => $college->mobile_no,
+                    'is_active'        => 1,
+                ];
 
-                // Password sirf naye app user ke liye generate hoga
                 if (!$existingAppUser) {
                     $generatedPassword = $this->generateRandomPassword(12);
                     $userData['password'] = $generatedPassword;
@@ -187,13 +185,48 @@ class CommonService
                 return $college->fresh();
             });
 
+
+            $loginUserStatus = false;
+
+            $loginUser = CollegeAppUser::where('college_id', $college->id)
+                ->where('user_privilege_id', 2)
+                ->first();
+
+            if (!empty($loginUser)) {
+                $loginUserStatus = true;
+                $college['login_user_id'] = $loginUser->id;
+            } else {
+                $loginUserStatus = false;
+                $college['login_user_id'] = null;
+            }
+            $college['login_user_created'] = $loginUserStatus;
+
+            // now check for db connection created or not for this client
+            // $connectionName = $request->group;
+            // $databaseConnectionExists = false;
+            // if (!empty($connectionName)) {
+            //     $databaseConnectionExists = config("database.connections.{$connectionName}") !== null;
+            // }
+            // $college['database_connection_created'] = $databaseConnectionExists;
+
+            // Check database connection created or not
+            $connectionName = $college->group;
+
+            $connections = config('database.connections', []);
+
+            $databaseConnectionExists = array_key_exists(
+                $connectionName,
+                $connections
+            );
+
+            $college['database_connection_created'] = $databaseConnectionExists;
+
             return response()->json([
                 'status' => true,
                 'message' => $id
                     ? 'College and app user updated successfully.'
                     : 'College and app user created successfully.',
                 'data' => $college,
-                // Naya app user bana ho tabhi value aayegi, warna null
                 'created_app_user_password' => $generatedPassword,
             ], $id ? 200 : 201);
         } catch (ValidationException $e) {
@@ -296,6 +329,44 @@ class CommonService
         }
 
         return implode('', $password);
+    }
+
+    // for generate unique record slug
+
+
+    public function generateUniqueSlug(
+        string $value,
+        string $modelClass,
+        string $primaryKey,
+        ?int $ignoreId = null
+    ): string {
+
+        $baseSlug = Str::slug($value);
+
+        if (empty($baseSlug)) {
+            $baseSlug = 'item';
+        }
+
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while (true) {
+
+            $query = $modelClass::where('slug', $slug);
+
+            if ($ignoreId !== null) {
+                $query->where($primaryKey, '!=', $ignoreId);
+            }
+
+            if (!$query->exists()) {
+                break;
+            }
+
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 
 

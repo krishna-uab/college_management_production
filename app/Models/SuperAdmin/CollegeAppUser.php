@@ -35,7 +35,6 @@ class CollegeAppUser extends Authenticatable implements JWTSubject
 
     protected $hidden = [
         'password',
-        'user_key',
     ];
 
     protected function casts(): array

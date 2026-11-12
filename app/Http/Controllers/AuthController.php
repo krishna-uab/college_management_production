@@ -412,12 +412,14 @@ class AuthController extends Controller
     public function logout(): JsonResponse
     {
         try {
-            Auth::guard('api')->logout();
 
+            Auth::guard('api')->logout();
             return response()->json([
                 'status'  => true,
                 'message' => 'Logged out successfully.',
             ])->withCookie(cookie()->forget('access_token'));
+
+            
         } catch (JWTException $e) {
             return response()->json([
                 'status'  => false,
@@ -426,60 +428,6 @@ class AuthController extends Controller
         }
     }
 
-    // public function refresh()
-    // {
-    //     try {
-    //         $oldToken = JWTAuth::getToken();
-
-    //         if (!$oldToken) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Token not provided.',
-    //             ], 401);
-    //         }
-
-    //         $token = JWTAuth::refresh($oldToken);
-
-    //         JWTAuth::setToken($token);
-
-    //         $payload = JWTAuth::getPayload();
-
-    //         $user = JWTAuth::authenticate();
-
-    //         if (!$user) {
-    //             JWTAuth::invalidate($token);
-
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'User not found.',
-    //             ], 401);
-    //         }
-
-    //         $collegeDetails = $this->checkCollegePlan($user->college_id);
-
-
-    //         if (!$collegeDetails['valid']) {
-    //             JWTAuth::invalidate($token);
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => $collegeDetails['message'],
-    //             ], 403);
-    //         }
-
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Token refreshed successfully.',
-    //             'token' => $token,
-    //             'token_type' => 'Bearer',
-    //             'expires_in' => auth('api')->factory()->getTTL() * 60,
-    //         ]);
-    //     } catch (JWTException $e) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Token expired or invalid. Please login again.',
-    //         ], 401);
-    //     }
-    // }
 
 
     public function refresh(): JsonResponse

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\TenantModels;
 
 use App\Traits\UsesDatabaseConnection;
 use Illuminate\Database\Eloquent\Model;

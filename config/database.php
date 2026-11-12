@@ -51,22 +51,7 @@ return [
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
-        
-        'tenant' => [
-            'driver' => 'mysql',
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => '',
-            'username' => '',
-            'password' => '',
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-        ],
+
 
         'krishna_deg' => [
             'driver' => 'mysql',
@@ -106,25 +91,6 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
-        ],
-
-        'college_1' => [
-          'driver' => 'mysql',
-          'url' => NULL,
-          'host' => '127.0.0.1',
-          'port' => '3306',
-          'database' => 'college_1_db',
-          'username' => 'college_1_user',
-          'password' => '12345678',
-          'unix_socket' => '',
-          'charset' => 'utf8mb4',
-          'collation' => 'utf8mb4_unicode_ci',
-          'prefix' => '',
-          'prefix_indexes' => true,
-          'strict' => true,
-          'engine' => NULL,
-          'options' => [
-                    ],
         ],
     ],
 

@@ -8,6 +8,8 @@ use App\Models\SuperAdmin\FranchiseAgreement;
 use App\Models\SuperAdmin\FranchiseBankDetail;
 use App\Models\SuperAdmin\FranchiseDocument;
 use App\Models\SuperAdmin\FranchiseMaster;
+use App\Models\SuperAdmin\ClientPlan;
+use App\Models\SuperAdmin\PlanType;
 use App\Services\CommonService;
 use App\Services\CrudService;
 use App\Services\FileService;
@@ -16,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -95,16 +98,45 @@ class SuperadminController extends Controller
             case 'delete-franchise':
                 return $this->deleteFranchise($request, $data);
 
-                /* ==================== COLLEGE ==================== */
+                /* -------------------- CLIENT'S PLAN ------------------------- */
 
-            case 'get-colleges':
-                return $this->getCollege($request, $data);
+            case 'get-client-plans':
+                return $this->getClientPlans($request, $data);
+
+
+            case 'add-update-client-plan':
+                return $this->addUpdateClientPlan($request, $data);
+
+                /* -------------------- PLAN TYPES ------------------------- */
+
+            case 'get-plan-types':
+                return $this->getPlanTypes($request, $data);
+
+            case 'add-update-plan-type':
+                return $this->addUpdatePlanType($request, $data);
+
+            case 'get-plan-type-by-id':
+                return $this->getPlanTypeById($request, $data);
+
+            case 'delete-plan-type':
+                return $this->deletePlanType($request, $data);
+
+
+                /* ==================== COLLEGE & CLIENTS ==================== */
+
+            case 'get-clients':
+                return $this->getClients($request, $data);
+
+            case 'get-client-by-id':
+                return $this->getClientById($request, $data);
 
             case 'add-update-client':
-                return $this->addUpdateCollege($request, $data);
+                return $this->addUpdateClient($request, $data);
 
             case 'create-college-db-connection':
                 return $this->createCollegeDbConnection($request, $data);
+
+
 
             default:
                 return response()->json([
@@ -1017,6 +1049,7 @@ class SuperadminController extends Controller
                 $responseData = [
                     'franchise_id' => $franchise->id,
                     'email' => $franchise->owner_email,
+                    'login_key' => $loginUser->user_key,
                     'mobile_no' => $franchise->owner_phone,
                     'login_user_id' => $loginUser->id,
                 ];
@@ -1024,6 +1057,7 @@ class SuperadminController extends Controller
                 $responseData = [
                     'franchise_id' => $franchise->id,
                     'email' => $franchise->owner_email,
+                    'login_key' => null,
                     'mobile_no' => $franchise->owner_phone,
                     'login_user_id' => null,
                 ];
@@ -1186,32 +1220,319 @@ class SuperadminController extends Controller
         }
     }
 
-    /* =====================================================================
-     |  COLLEGE
-     | ===================================================================== */
+    /* ========================= CLIENT PLANS =============================== */
 
-    // 16. Get all colleges
-    public function getCollege(Request $request, $data)
+    // 16. get client plans
+    public function getClientPlans(Request $request, $data)
     {
         try {
 
+            $plans = ClientPlan::orderBy('orders', 'asc')->get();
+
             return response()->json([
-                'status'  => true,
-                'data'    => $data,
+                'status' => true,
+                'message' => 'Client plans fetched successfully.',
+                'data' => $plans,
+                'errors' => null,
             ], 200);
-
-
         } catch (Throwable $e) {
+
             return response()->json([
-                'status'  => false,
-                'message' => 'Unable to fetch colleges.',
-                'error'   => $e->getMessage(),
+                'status' => false,
+                'message' => 'Unable to fetch client plans.',
+                'data' => null,
+                'errors' => $e->getMessage(),
             ], 500);
         }
     }
 
+    // 17. add or update client plan
+    public function addUpdateClientPlan(Request $request, $data)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'plan_id' => 'nullable|integer',
+                'plan_name' => 'required|string|max:100',
+                'plan_module_ids' => 'nullable|array',
+                'plan_module_ids.*' => 'integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed.',
+                    'data' => null,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $plan = null;
+
+            if ($request->filled('plan_id')) {
+
+                $plan = ClientPlan::find($request->plan_id);
+
+                if (!$plan) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Client plan not found.',
+                        'data' => null,
+                        'errors' => null,
+                    ], 404);
+                }
+            }
+
+            $slug = $this->commonService->generateUniqueSlug(
+                $request->plan_name,
+                ClientPlan::class,
+                'plan_id',
+                $plan?->plan_id
+            );
+
+            if (!$plan) {
+                $plan = new ClientPlan();
+            }
+
+            $plan->plan_name = $request->plan_name;
+            $plan->slug = $slug;
+            $plan->plan_module_ids = $request->input('plan_module_ids');
+
+            $plan->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => $request->filled('plan_id')
+                    ? 'Client plan updated successfully.'
+                    : 'Client plan added successfully.',
+                'data' => $plan->fresh(),
+                'errors' => null,
+            ], 200);
+        } catch (Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to save client plan.',
+                'data' => null,
+                'errors' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /* ========================= PLAN TYPES =============================== */
+
+    // 20. get plan types
+    public function getPlanTypes(Request $request, $data)
+    {
+        try {
+            $planTypes = PlanType::all();
+            return response()->json([
+                'status' => true,
+                'data' => $planTypes,
+            ], 200);
+        } catch (Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage() ?: 'Unable to fetch plan types.',
+            ], 500);
+        }
+    }
+
+    // 21. add or update plan type
+    public function addUpdatePlanType(Request $request, $data)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'user_type_id' => 'nullable|integer',
+                'user_type' => 'required|string|max:150',
+                'period_days' => 'nullable|integer|min:1',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed.',
+                    'data' => null,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $type = null;
+
+            if ($request->filled('user_type_id')) {
+
+                $type = PlanType::find($request->user_type_id);
+
+                if (!$type) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Plan type not found.',
+                        'data' => null,
+                        'errors' => null,
+                    ], 404);
+                }
+            }
+
+            $slug = $this->commonService->generateUniqueSlug(
+                $request->user_type,
+                PlanType::class,
+                'user_type_id',
+                $type?->user_type_id
+            );
+
+            if (!$type) {
+                $type = new PlanType();
+            }
+
+            $type->user_type = $request->user_type;
+            $type->slug = $slug;
+            $type->period_days = $request->input('period_days');
+
+            $type->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => $request->filled('user_type_id')
+                    ? 'Plan type updated successfully.'
+                    : 'Plan type added successfully.',
+                'data' => $type->fresh(),
+            ], 200);
+        } catch (Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage() ?: 'Unable to save plan type.',
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    // 22. get plan type by id
+    public function getPlanTypeById(Request $request, $data)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'user_type_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed.',
+                    'data' => null,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $type = PlanType::find($request->user_type_id);
+
+            if (!$type) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Plan type not found.',
+                    'data' => null,
+                    'errors' => null,
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Plan type fetched successfully.',
+                'data' => $type,
+                'errors' => null,
+            ], 200);
+        } catch (Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to fetch plan type.',
+                'data' => null,
+                'errors' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 23. delete plan type
+    public function deletePlanType(Request $request, $data)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'user_type_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed.',
+                    'data' => null,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $type = PlanType::find($request->user_type_id);
+
+            if (!$type) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Plan type not found.',
+                    'data' => null,
+                    'errors' => null,
+                ], 404);
+            }
+
+            $type->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Plan type deleted successfully.',
+                'data' => null,
+                'errors' => null,
+            ], 200);
+        } catch (Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Unable to delete plan type.',
+                'data' => null,
+                'errors' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /* ========================= COLLEGE & CLIENTS ============================== */
+
+    // 16. Get all colleges
+    public function getClients(Request $request, $data)
+    {
+        try {
+            $colleges = CollegeClient::with('getAdmin')->when(
+                !empty($data->franchise_id),
+                fn($q) => $q->where('franchise_id', $data->franchise_id)
+            )
+                ->orderBy('name')
+                ->get();
+
+            return response()->json([
+                'status' => true,
+                'data'   => $colleges,
+            ], 200);
+        } catch (Throwable $e) {
+            Log::error('getColleges failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'Unable to fetch colleges.',
+            ], 500);
+        }
+    }
+
+
     // 17. Add or update college
-    public function addUpdateCollege(Request $request, $data)
+    public function addUpdateClient(Request $request, $data)
     {
         return $this->commonService->addUpdateCollege(
             $request,
@@ -1221,38 +1542,63 @@ class SuperadminController extends Controller
     }
 
     // 18. Get college by ID
-    public function getCollegeById(Request $request, $data)
+    public function getClientById(Request $request, $data)
     {
+        $request->validate(['client_id' => 'required|integer']);
         try {
+            $client = CollegeClient::when(
+                !empty($data->franchise_id),
+                fn($q) => $q->where('franchise_id', $data->franchise_id)
+            )
+                ->find($request->client_id);
 
-            $columns =  [
-                'id',
-                'name',
-                'common_branch_id',
-                'school_app_code',
-                'status',
-                'reg_date',
-                'renewal_date',
-                'user_type',
-                'plan_type',
-                'log_time',
-                'active_day',
-                'grace_period',
-                'franchise_id',
-            ];
+            if (!$client) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Client not found.',
+                ], 404);
+            }
 
-            $colleges = $this->crudService->getRecordWithCustomColumns(CollegeClient::class, $columns, [], ["id" => $request->id], 'id', 'desc');
+            $payload = $client->toArray();
+
+            unset($payload['app_user_relation_key']);
+            unset($payload['db_password']);
+
+            // check login user created or not for this client
+
+            $loginUserStatus = false;
+
+            $loginUser = CollegeAppUser::where('college_id', $client->id)
+                ->where('user_privilege_id', 2)
+                ->first();
+
+            if (!empty($loginUser)) {
+                $loginUserStatus = true;
+                $payload['login_user_id'] = $loginUser->id;
+            } else {
+                $loginUserStatus = false;
+                $payload['login_user_id'] = null;
+            }
+            $payload['login_user_created'] = $loginUserStatus;
+
+            // now check for db connection created or not for this client
+            $connectionName = $client->group;
+            $databaseConnectionExists = false;
+            if (!empty($connectionName)) {
+                $databaseConnectionExists = config("database.connections.{$connectionName}") !== null;
+            }
+            $payload['database_connection_created'] = $databaseConnectionExists;
 
             return response()->json([
-                'status'  => true,
-                'message' => 'College list fetched successfully.',
-                'data'    => $colleges,
+                'status' => true,
+                'data'   => $payload,
             ], 200);
         } catch (Throwable $e) {
+            Log::error('getClientById failed', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'status'  => false,
-                'message' => 'Unable to fetch colleges.',
-                'error'   => $e->getMessage(),
+                'message' =>  $e->getMessage(),
             ], 500);
         }
     }
