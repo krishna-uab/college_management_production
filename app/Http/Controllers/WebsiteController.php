@@ -10,6 +10,7 @@ use Throwable;
 
 class WebsiteController extends Controller
 {
+    // use Trait here
 
     use ResolveDatabaseConnection;
 
@@ -62,7 +63,7 @@ class WebsiteController extends Controller
                 'message' => 'Academic session fetched successfully.',
                 'data'    => $session,
             ], 200);
-            
+
         } catch (Throwable $e) {
 
             report($e);
