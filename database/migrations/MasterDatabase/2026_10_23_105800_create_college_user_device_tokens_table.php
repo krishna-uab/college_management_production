@@ -6,13 +6,16 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('user_device_tokens', function (Blueprint $table) {
+        Schema::create('college_user_device_tokens', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('college_id')
-                ->constrained('all_colleges')
+                ->constrained('college_clients')
                 ->cascadeOnDelete();
 
             $table->foreignId('user_id')
@@ -49,6 +52,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_device_tokens');
+        Schema::dropIfExists('college_user_device_tokens');
     }
 };

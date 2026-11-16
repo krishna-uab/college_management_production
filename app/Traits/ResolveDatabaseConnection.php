@@ -42,7 +42,6 @@ trait ResolveDatabaseConnection
         return $group;
     }
 
-
     protected function switchModels(array $models): string
     {
         $conn = $this->collegeConnection();
@@ -53,36 +52,4 @@ trait ResolveDatabaseConnection
         return $conn;
     }
 
-
-    // protected function collegeConnection(): string
-    // {
-    //     $dbName = $this->tokenValue('db_name');
-
-    //     if (!$dbName) {
-    //         abort(response()->json([
-    //             'status'  => false,
-    //             'message' => 'Invalid db group.',
-    //         ], 403));
-    //     }
-
-    //     // Yahan DB username/password set karein
-    //     Config::set('database.connections.tenant.database', $dbName);
-    //     Config::set('database.connections.tenant.username', env('TENANT_DB_USERNAME', 'root'));
-    //     Config::set('database.connections.tenant.password', env('TENANT_DB_PASSWORD', ''));
-
-    //     DB::purge('tenant');
-
-    //     return 'tenant';
-    // }
-
-    // protected function switchModels(array $models): string
-    // {
-    //     $conn = $this->collegeConnection();
-
-    //     foreach ($models as $model) {
-    //         $model::useConnection($conn);
-    //     }
-
-    //     return $conn;
-    // }
 }
