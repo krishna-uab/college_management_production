@@ -12,10 +12,6 @@ Route::middleware([
     'checkCollegePlan',
 ])->group(function () {
 
-// Route::middleware([
-//     \App\Http\Middleware\JwtCookieMiddleware::class,
-// ])->group(function () {
-
     Route::get('/v1/user', [AuthController::class, 'getUser']);
 
     Route::post('/v1/logout', [AuthController::class, 'logout']);

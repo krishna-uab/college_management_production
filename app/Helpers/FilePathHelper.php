@@ -51,6 +51,27 @@
         return asset_dir($relativePath, $use);
     }
 
+    function institute_asset_dir($group, $use = 'external')
+    {
+        $group = trim($group, '/');
+        $relativePath = 'assets/institutes/' . $group;
+        return asset_dir($relativePath, $use);
+    }
+
+    function institute_documents_dir($group, $use = 'external')
+    {
+        $group = trim($group, '/');
+        $relativePath = 'assets/institutes/' . $group . "/documents";
+        return asset_dir($relativePath, $use);
+    }
+
+    function institute_slider_dir($group, $use = 'external')
+    {
+        $group = trim($group, '/');
+        $relativePath = 'assets/institutes/' . $group . "/slider";
+        return asset_dir($relativePath, $use);
+    }
+
 
     function default_user_img()
     {

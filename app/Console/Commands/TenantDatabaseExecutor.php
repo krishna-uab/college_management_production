@@ -21,8 +21,8 @@ class TenantDatabaseExecutor extends Command
         $action = $this->argument('action');
         $path = 'database/migrations/TenantDatabase';
 
-        if (!in_array($action, ['migrate', 'rollback', 'fresh'], true)) {
-            $this->error('Invalid action: ' . $action . ' (allowed: migrate, rollback, fresh)');
+        if (!in_array($action, ['migrate', 'rollback', 'fresh','status'], true)) {
+            $this->error('Invalid action: ' . $action . ' (allowed: migrate, rollback, fresh, status)');
             return self::FAILURE;
         }
 

@@ -15,12 +15,10 @@ class WebsiteSlider extends Model
     protected $fillable = [
         'image',
         'is_active',
-        'college_id',
         'session_id',
         'created_by',
         'updated_by',
         'deleted_by',
-        'is_deleted',
         'ip_address',
     ];
 
@@ -28,8 +26,6 @@ class WebsiteSlider extends Model
     {
         return [
             'is_active' => 'boolean',
-            'is_deleted' => 'boolean',
-            'college_id' => 'integer',
             'session_id' => 'integer',
         ];
     }

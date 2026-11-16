@@ -23,25 +23,12 @@ return new class extends Migration
             $table->string('request_method', 10)->nullable();
             $table->string('url', 2048)->nullable();
             $table->timestamp('created_at')->useCurrent();
-            $table->index(
-                ['user_id', 'created_at'],
-                'ual_user_created_idx'
-            );
 
-            $table->index(
-                ['module', 'created_at'],
-                'ual_module_created_idx'
-            );
-
-            $table->index(
-                ['action', 'created_at'],
-                'ual_action_created_idx'
-            );
-
-            $table->index(
-                ['module', 'record_id'],
-                'ual_record_idx'
-            );
+            $table->index(['user_id', 'created_at'],'ual_user_created_idx');
+            $table->index(['module', 'created_at'],'ual_module_created_idx');
+            $table->index(['action', 'created_at'],'ual_action_created_idx');
+            $table->index(['module', 'record_id'],'ual_record_idx');
+            
         });
     }
 

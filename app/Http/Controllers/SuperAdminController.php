@@ -10,8 +10,8 @@ use App\Models\SuperAdmin\FranchiseDocument;
 use App\Models\SuperAdmin\FranchiseMaster;
 use App\Models\SuperAdmin\ClientPlan;
 use App\Models\SuperAdmin\PlanType;
+use App\Models\TenantModels\AcademicSession;
 use App\Services\CommonService;
-use App\Services\CrudService;
 use App\Services\FileService;
 use App\Traits\DatabaseConnectionWriter;
 use Illuminate\Http\Request;
@@ -32,14 +32,11 @@ class SuperadminController extends Controller
     // trait
     use DatabaseConnectionWriter;
 
-    protected CrudService $crudService;
     protected CommonService $commonService;
 
     public function __construct(
-        CrudService $crudService,
         CommonService $commonService
     ) {
-        $this->crudService = $crudService;
         $this->commonService = $commonService;
     }
 
@@ -50,8 +47,6 @@ class SuperadminController extends Controller
         $data = JWTAuth::getPayload();
 
         switch ($action) {
-
-
 
             case 'get-franchise':
                 return $this->getFrachise($request, $data);
@@ -88,15 +83,6 @@ class SuperadminController extends Controller
 
             case 'trash-franchise':
                 return $this->trashFrachise($request, $data);
-
-            case 'restore-franchise':
-                return $this->restoreFranchise($request, $data);
-
-            case 'deleted-franchises':
-                return $this->deletedFranchise($data);
-
-            case 'delete-franchise':
-                return $this->deleteFranchise($request, $data);
 
                 /* -------------------- CLIENT'S PLAN ------------------------- */
 
@@ -137,6 +123,12 @@ class SuperadminController extends Controller
                 return $this->createCollegeDbConnection($request, $data);
 
 
+                /* ==================== GENERATE SESSIONS  ==================== */
+            case 'get-sessions':
+                return $this->getSessions($request, $data);
+
+            case 'generate-session':
+                return $this->generateSession($request, $data);
 
             default:
                 return response()->json([
@@ -1093,15 +1085,14 @@ class SuperadminController extends Controller
         }
 
         try {
-            $this->crudService->softDelete(
-                FranchiseMaster::class,
-                (int) $request->id
-            );
+
+            FranchiseMaster::delete($request->id);
 
             return response()->json([
                 'status'  => true,
                 'message' => 'Franchise moved to trash successfully.',
             ], 200);
+            
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => false,
@@ -1116,105 +1107,6 @@ class SuperadminController extends Controller
             return response()->json([
                 'status'  => false,
                 'message' => 'Unable to move franchise to trash.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    // 13. Restore franchise from trash
-    public function restoreFranchise(Request $request, $data)
-    {
-        try {
-            $franchise = $this->crudService->restore(
-                FranchiseMaster::class,
-                $request->id
-            );
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Trashed franchise restored successfully.',
-                'data'    => $franchise,
-            ], 200);
-        } catch (LogicException $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => $e->getMessage(),
-            ], 400);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to restore franchise or already restored.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    // 14. Get trashed franchises
-    public function deletedFranchise($data)
-    {
-        try {
-            $franchises = $this->crudService->getTrashed(
-                FranchiseMaster::class
-            );
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Trashed franchises fetched successfully.',
-                'data'    => $franchises,
-            ], 200);
-        } catch (LogicException $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => $e->getMessage(),
-            ], 400);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to fetch trashed franchises.',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    // 15. Permanently delete franchise
-    public function deleteFranchise(Request $request, $data)
-    {
-        $validator = Validator::make($request->all(), [
-            'franchise_id' => 'required|integer',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Validation failed.',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $this->crudService->forceDelete(
-                FranchiseMaster::class,
-                (int) $request->id
-            );
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Franchise permanently deleted successfully.',
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Trashed franchise not found.',
-            ], 404);
-        } catch (LogicException | InvalidArgumentException $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => $e->getMessage(),
-            ], 400);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Unable to permanently delete franchise.',
                 'error'   => $e->getMessage(),
             ], 500);
         }
@@ -1503,8 +1395,6 @@ class SuperadminController extends Controller
         }
     }
 
-    /* ========================= COLLEGE & CLIENTS ============================== */
-
     // 16. Get all colleges
     public function getClients(Request $request, $data)
     {
@@ -1603,7 +1493,61 @@ class SuperadminController extends Controller
         }
     }
 
-    // 19. Create college DB connection
+    // 19. get all session details for a particular college, company and other entities
+    public function getSessions($request, $data)
+    {
+        try {
+            AcademicSession::useConnection($request->group);
+            $sessions = AcademicSession::orderByDesc('id')->get();
+            return response()->json([
+                'status' => true,
+                'message' => 'Sessions fetched successfully',
+                'data' => $sessions
+            ]);
+        } catch (Throwable $th) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    // 20. generate session
+    public function generateSession($request, $data)
+    {
+        try {
+
+            AcademicSession::useConnection($request->group);
+
+            $session = AcademicSession::updateOrCreate(
+                [
+                    'id' => $request->session_id,
+                ],
+                [
+                    'school_id' => $request->school_id,
+                    'session_name' => $request->session_name,
+                    'session_start' => $request->session_start,
+                    'session_end' => $request->session_end,
+                    'status' => 0,
+                ]
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Session saved successfully',
+                'data' => $session
+            ]);
+        } catch (Throwable $th) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    // Create college DB connection
     public function createCollegeDbConnection(Request $request, $data): JsonResponse
     {
         $validatedData = $request->validate([
