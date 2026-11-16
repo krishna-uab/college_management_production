@@ -97,6 +97,8 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
+    'frontend_crypto_key' => env('FRONTEND_CRYPTO_KEY'),
+
     'key' => env('APP_KEY'),
 
     'previous_keys' => [

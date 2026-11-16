@@ -35,7 +35,6 @@ class CollegeAppUser extends Authenticatable implements JWTSubject
 
     protected $hidden = [
         'password',
-        'user_key',
     ];
 
     protected function casts(): array
@@ -54,7 +53,7 @@ class CollegeAppUser extends Authenticatable implements JWTSubject
     public function college(): BelongsTo
     {
         return $this->belongsTo(
-            AllCollege::class,
+            CollegeClient::class,
             'college_id',
             'id'
         );
